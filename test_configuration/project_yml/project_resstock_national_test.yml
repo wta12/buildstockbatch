@@ -3,22 +3,23 @@ buildstock_directory: '/home/nrel_stock_docker/Github/resstock'  # Relative to t
 project_directory: project_national  # Relative to buildstock_directory
 output_directory: ../../../../Output
 # weather_files_url: https://data.nrel.gov/system/files/156/BuildStock_TMY3_FIPS.zip
-weather_files_path: ../weather/weather.zip  # Relative to this file or absolute path to zipped weather files
-
-# sampler:
-#   type: residential_quota_downselect
-#   args:
-#     n_datapoints: 3
-#     logic:
-#       - Geometry Building Type RECS|Single-Family Detached
-#       - Vacancy Status|Occupied
-#     resample: fasle
+# weather_files_path: ../weather/weather.zip  # Relative to this file or absolute path to zipped weather files
+weather_files_path: ../BuildStock_TMY3_FIPS.zip  # Relative to this file or absolute path to zipped weather files
 
 sampler:
-  type: precomputed
+  type: residential_quota_downselect
   args:
-    # n_datapoints: 4
-    sample_file: ../build_stock_inputs/buildstock_sampled.csv # n_datapoints determined from csv file
+    n_datapoints: 3
+    logic:
+      - Geometry Building Type RECS|Single-Family Detached
+      - Vacancy Status|Occupied
+    resample: fasle
+
+# sampler:
+#   type: precomputed
+#   args:
+#     # n_datapoints: 4
+#     sample_file: ../build_stock_inputs/buildstock_sampled.csv # n_datapoints determined from csv file
 
 workflow_generator:
   type: residential_default
@@ -30,15 +31,15 @@ workflow_generator:
 baseline:
   n_buildings_represented: 3  # Total number of residential dwelling units in contiguous United States, including unoccupied units, resulting from a census tract level query of ACS 5-yr 2016 (i.e. 2012-2016), using this script: https://github.com/NREL/resstock-estimation/blob/master/sources/spatial/tsv_maker.py.
 
-# upgrades:
-#   - upgrade_name: Triple-Pane Windows
-#     options:
-#       - option: Windows|Low-E, Triple, Non-metal, Air, L-Gain
-# #        apply_logic:
-#         costs:
-#           - value: 45.77
-#             multiplier: Window Area (ft^2)
-#         lifetime: 30
+upgrades:
+  - upgrade_name: Triple-Pane Windows
+    options:
+      - option: Windows|Low-E, Triple, Non-metal, Air, L-Gain
+#        apply_logic:
+        costs:
+          - value: 45.77
+            multiplier: Window Area (ft^2)
+        lifetime: 30
 
 # eagle:
 #   n_jobs: 4

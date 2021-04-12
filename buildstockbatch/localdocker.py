@@ -140,8 +140,8 @@ class LocalDockerBatch(DockerBatchBase):
         with open(os.path.join(sim_dir, 'in.osw'), 'w') as f:
             json.dump(osw, f, indent=4)
 
-        print(os.path.abspath(os.path.join(sim_dir, 'in.osw')),
-              os.path.exists(os.path.join(sim_dir, 'in.osw')))
+        # print(os.path.abspath(os.path.join(sim_dir, 'in.osw')),
+        #       os.path.exists(os.path.join(sim_dir, 'in.osw')))
 
         docker_client = docker.client.from_env()
         args = [
@@ -156,19 +156,16 @@ class LocalDockerBatch(DockerBatchBase):
         if sys.platform.startswith('linux'):
             extra_kws['user'] = f'{os.getuid()}:{os.getgid()}'
         logger.debug("docker_volume_mounts %s" % docker_volume_mounts)
-        # import glob
-        # print(glob.glob(weather_dir+"/*"))
-        # put
 
-        container_output = docker_client.containers.run(
-            docker_image,
-            command = "ls -la ./weather",
-            remove=True,
-            volumes=docker_volume_mounts,
-            name=sim_id,
-            **extra_kws
-        )
-        logger.debug("test_container_output: %s" % container_output.decode("utf-8"))
+        # container_output = docker_client.containers.run(
+        #     docker_image,
+        #     command = "ls -la ./weather",
+        #     remove=True,
+        #     volumes=docker_volume_mounts,
+        #     name=sim_id,
+        #     **extra_kws
+        # )
+        # logger.debug("test_container_output: %s" % container_output.decode("utf-8"))
 
 
 
@@ -231,50 +228,100 @@ class LocalDockerBatch(DockerBatchBase):
             docker_buildstock_dir =   self.buildstock_dir
             docker_result_dir = self.results_dir
 
-        test_output= self.run_building(
-            self.project_dir,
-            self.buildstock_dir,
-            self.weather_dir,
-            self.docker_image,
-           self.results_dir,
-            measures_only,
-            n_datapoints,
-            self.cfg,
-            i = 1
-            )
-        logger.debug("test_output: %s" % test_output)
-        put
+        # test_output= self.run_building(
+        #     self.project_dir,
+        #     self.buildstock_dir,
+        #     self.weather_dir,
+        #     self.docker_image,
+        #    self.results_dir,
+        #     measures_only,
+        #     n_datapoints,
+        #     self.cfg,
+        #     i = 1
+        #     )
+        # logger.debug("test_output: %s" % test_output)
+
         test_agrument_inputs = {
             "self.project_dir" :   self.project_dir,
-            "docker_buildstock_dir" :   docker_buildstock_dir,
+            "self.results_dir" :   self.buildstock_dir,
             "self.weather_dir"  : self.weather_dir,
             "self.docker_image" :  self.docker_image,
-            "docker_result_dir"  : docker_result_dir,
+            "self.results_dir"  : self.results_dir,
             "measures_only"  :  measures_only,
             "n_datapoints"  :  n_datapoints,
             "self.cfg" :  self.cfg,
             "i" : 1
             }
+        test_agrument_input_text = ''
         for i,v in test_agrument_inputs.items():
-            logger.debug("test_%s : %s"%(i,v))
+            test_agrument_input_text += "test_%s : %s"%(i,v)+"\n"
+        logger.debug("test_agrument_inputs:\n%s" % test_agrument_input_text)
+
+        index_args = (
+            "project_dir",
+            "buildstock_dir",
+            "weather_dir",
+            "docker_image",
+            "results_dir",
+            "measures_only",
+            "n_datapoints",
+            "cfg",
+            "i",
+            "real_upgrade_idx"
+            )
+
         upgrade_sims = []
+        # for i in range(len(self.cfg.get('upgrades', []))):
+        #     logger.debug("i: %s : building_ids : %s" % (i,building_ids))
+
         for i in range(len(self.cfg.get('upgrades', []))):
             upgrade_sims.append(map(functools.partial(run_building_d, upgrade_idx=i), building_ids))
+        # logger.debug(upgrade_sims)
+        # logger.debug(len(upgrade_sims))
+        # for k,mapper in enumerate(upgrade_sims):
+        #     for i,v in enumerate(list(mapper)):
+        #         # logger.debug(v)
+
+        #         all_sim_text = "upgrade_sims_%s_%s:\nelement0:\n%s\nelement1:\n" % (k,i,v[0])
+        #         for n,element in enumerate(v[1]):
+        #             all_sim_text+="%s : %s\n" % (index_args[n],element)
+        #         # for element in v:
+        #         #     all_sim_text+="%s\n" % element
+        #         all_sim_text+="last:\n%s" % v[2:]
+        #         logger.debug(all_sim_text)
+
+
         if not self.skip_baseline_sims:
             baseline_sims = map(run_building_d, building_ids)
+            # for i,v in enumerate(list(baseline_sims)):
+            #     all_sim_text = "baseline_sims_%s:\nelement0:\n%s\nelement1:\n" % (i,v[0])
+            #     for n,element in enumerate(v[1]):
+            #         all_sim_text+="%s : %s\n" % (index_args[n],element)
+            #     # for element in v:
+            #     #     all_sim_text+="%s\n" % element
+            #     all_sim_text+="last:\n%s" % v[2:]
+            #     logger.debug(all_sim_text)
             all_sims = itertools.chain(baseline_sims, *upgrade_sims)
         else:
             all_sims = itertools.chain(*upgrade_sims)
         if n_jobs is None:
             client = docker.client.from_env()
             n_jobs = client.info()['NCPU']
-        for i,v in enumerate(list(all_sims)):
-            logger.debug("all_sim_%s: %s" %(i,v))
-        put
-        dpouts = Parallel(n_jobs=n_jobs, verbose=50)(all_sims)
+        # logger.debug("all_SIMS:")
+        # logger.debug(list(all_sims))
+        # for i,v in enumerate(list(all_sims)):
+        #     all_sim_text = "all_sim_%s:\nelement0:\n%s\nelement1:\n" % (i,v[0])
+        #     for n,element in enumerate(v[1]):
+        #         all_sim_text+="%s : %s\n" % (index_args[n],element)
+        #     # for element in v:
+        #     #     all_sim_text+="%s\n" % element
+        #     all_sim_text+="last:\n%s" % v[2:]
+        #     logger.debug(all_sim_text)
 
+        dpouts = Parallel(n_jobs=n_jobs, verbose=50)(all_sims)
+        logger.debug("dpouts:\n%s" % json.dumps(dpouts))
         sim_out_dir = os.path.join(self.results_dir, 'simulation_output')
-        put
+
         results_job_json_filename = os.path.join(sim_out_dir, 'results_job0.json.gz')
         with gzip.open(results_job_json_filename, 'wt', encoding='utf-8') as f:
             json.dump(dpouts, f)
