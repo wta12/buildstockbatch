@@ -3,8 +3,8 @@ buildstock_directory: '/home/nrel_stock_docker/Github/resstock'  # Relative to t
 project_directory: project_national  # Relative to buildstock_directory
 output_directory: ../../../../Output
 # weather_files_url: https://data.nrel.gov/system/files/156/BuildStock_TMY3_FIPS.zip
-# weather_files_path: ../weather/weather.zip  # Relative to this file or absolute path to zipped weather files
-weather_files_path: ../BuildStock_TMY3_FIPS.zip  # Relative to this file or absolute path to zipped weather files
+weather_files_path: ../weather/weather.zip  # Relative to this file or absolute path to zipped weather files
+# weather_files_path: ../BuildStock_TMY3_FIPS.zip  # Relative to this file or absolute path to zipped weather files
 
 sampler:
   type: residential_quota_downselect
