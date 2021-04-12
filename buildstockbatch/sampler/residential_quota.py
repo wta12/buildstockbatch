@@ -58,6 +58,25 @@ class ResidentialQuotaSampler(BuildStockSampler):
         extra_kws = {}
         if sys.platform.startswith('linux'):
             extra_kws['user'] = f'{os.getuid()}:{os.getgid()}'
+        if os.environ['HOST_PATH']:
+            host_path  = "/"+os.environ['HOST_PATH'].replace("\\","/").replace(":","")
+            docker_path =   self.buildstock_dir.replace(os.environ['PWD'],host_path)
+        else:
+            docker_path = self.buildstock_dir
+
+
+        container_output = docker_client.containers.run(
+            self.parent().docker_image,
+            command = "ls -la %s" % self.cfg['project_directory'],
+            remove=True,
+            volumes={
+                docker_path: {'bind': '/var/simdata/openstudio', 'mode': 'rw'}
+            },
+            name='buildstock_sampling',
+            **extra_kws
+        )
+        logger.debug(container_output.decode('utf-8'))
+
         container_output = docker_client.containers.run(
             self.parent().docker_image,
             [
@@ -69,16 +88,20 @@ class ResidentialQuotaSampler(BuildStockSampler):
             ],
             remove=True,
             volumes={
-                self.buildstock_dir: {'bind': '/var/simdata/openstudio', 'mode': 'rw'}
+                docker_path: {'bind': '/var/simdata/openstudio', 'mode': 'rw'}
             },
             name='buildstock_sampling',
             **extra_kws
         )
+
         tick = time.time() - tick
         for line in container_output.decode('utf-8').split('\n'):
             logger.debug(line)
         logger.debug('Sampling took {:.1f} seconds'.format(tick))
         destination_filename = self.csv_path
+        logger.debug("destination_filename: %s" % destination_filename)
+        logger.debug("source_filename: %s" % os.path.join(self.buildstock_dir, 'resources', 'buildstock.csv') )
+
         if os.path.exists(destination_filename):
             os.remove(destination_filename)
         shutil.move(

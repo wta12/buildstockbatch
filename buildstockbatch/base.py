@@ -55,7 +55,7 @@ class BuildStockBatchBase(object):
 
         # Load project file to self.cfg
         self.cfg = get_project_configuration(project_filename)
-
+        logger.debug("self.cfg: %s" % self.cfg)
         self.buildstock_dir = self.cfg['buildstock_directory']
         if not os.path.isdir(self.buildstock_dir):
             raise FileNotFoundError(f'buildstock_directory = {self.buildstock_dir} is not a directory.')
@@ -90,12 +90,20 @@ class BuildStockBatchBase(object):
         return path_rel_to_file(self.project_filename, x)
 
     def _get_weather_files(self):
+
         if 'weather_files_path' in self.cfg:
             logger.debug('Copying weather files')
             weather_file_path = self.cfg['weather_files_path']
+            logger.debug("weathter_files_path: %s" % os.path.abspath(self.cfg['weather_files_path']))
+            logger.debug("self.weather_dir: %s" % self.weather_dir)
+
             with zipfile.ZipFile(weather_file_path, 'r') as zf:
                 logger.debug('Extracting weather files to: {}'.format(self.weather_dir))
                 zf.extractall(self.weather_dir)
+            import glob
+            files = glob.glob(self.weather_dir+"/*")
+            logger.debug("self.weather_dir exist? %s\n%s" % (os.path.exists(self.weather_dir),'\n'.join(files)))
+
         else:
             logger.debug('Downloading weather files')
             r = requests.get(self.cfg['weather_files_url'], stream=True)

@@ -105,8 +105,10 @@ class DownselectSamplerBase(BuildStockSampler):
         if self.resample:
             logger.debug('Performing initial sampling to figure out number of samples for downselect')
             n_samples_init = 350000
+            n_samples_init = 50  ## test
             init_sampler = self.SUB_SAMPLER_CLASS(self.parent(), n_datapoints=n_samples_init, **self.sub_kw)
             buildstock_csv_filename = init_sampler.run_sampling()
+            logger.debug("init_resample_buildstock_csv_file_name: %s"% buildstock_csv_filename)
             df = pd.read_csv(buildstock_csv_filename, index_col=0)
             df_new = df[self.downselect_logic(df, self.logic)]
             downselected_n_samples_init = df_new.shape[0]
@@ -115,8 +117,11 @@ class DownselectSamplerBase(BuildStockSampler):
             del init_sampler
         else:
             n_samples = self.n_datapoints
+
         sampler = self.SUB_SAMPLER_CLASS(self.parent(), n_datapoints=n_samples, **self.sub_kw)
         buildstock_csv_filename = sampler.run_sampling()
+        logger.debug("final_resample_buildstock_csv_file_name: %s"% buildstock_csv_filename)
+
         with gzip.open(os.path.splitext(buildstock_csv_filename)[0] + '_orig.csv.gz', 'wb') as f_out:
             with open(buildstock_csv_filename, 'rb') as f_in:
                 shutil.copyfileobj(f_in, f_out)

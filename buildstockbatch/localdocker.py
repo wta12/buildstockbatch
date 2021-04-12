@@ -80,9 +80,16 @@ class LocalDockerBatch(DockerBatchBase):
 
     @property
     def weather_dir(self):
+
+
         if self._weather_dir is None:
             self._weather_dir = tempfile.TemporaryDirectory(dir=self.results_dir, prefix='weather')
+            # logger.debug("self._weather_dir is None")
             self._get_weather_files()
+        # else:
+        #     self._get_weather_files()
+        # logger.debug("_weather_dir: %s" % self._weather_dir)
+
         return self._weather_dir.name
 
     @classmethod
@@ -93,17 +100,36 @@ class LocalDockerBatch(DockerBatchBase):
 
         try:
             sim_id, sim_dir = cls.make_sim_dir(i, upgrade_idx, os.path.join(results_dir, 'simulation_output'))
+
         except SimulationExists:
             return
 
+        logger.debug("sim_id %s" %sim_id)
+        logger.debug("sim_dir %s" % sim_dir)
+        logger.debug("projectdir % s" % project_dir)
+        logger.debug("buildstock_dir % s" % buildstock_dir)
+
+        if os.environ['HOST_PATH']:
+            host_path  = "/"+os.environ['HOST_PATH'].replace("\\","/").replace(":","")
+            docker_buildstock_dir = buildstock_dir.replace(os.environ['PWD'],host_path)
+            docker_sim_dir = sim_dir.replace(os.environ['PWD'],host_path)
+            docker_project_dir  = project_dir.replace(os.environ['PWD'],host_path)
+            docker_weather_dir = weather_dir.replace(os.environ['PWD'],host_path)
+        else:
+            docker_buildstock_dir = buildstock_dir
+            docker_sim_dir = sim_dir
+            docker_project_dir  = project_dir
+            docker_weather_dir = weather_dir
+        # docker_buildstock_dir = buildstock_dir
         bind_mounts = [
-            (sim_dir, '', 'rw'),
-            (os.path.join(buildstock_dir, 'measures'), 'measures', 'ro'),
-            (os.path.join(buildstock_dir, 'resources'), 'lib/resources', 'ro'),
-            (os.path.join(project_dir, 'housing_characteristics'), 'lib/housing_characteristics', 'ro'),
-            (weather_dir, 'weather', 'ro')
+            (docker_sim_dir, '', 'rw'),
+            (os.path.join(docker_buildstock_dir, 'measures'), 'measures', 'ro'),
+            (os.path.join(docker_buildstock_dir, 'resources'), 'lib/resources', 'ro'),
+            (os.path.join(docker_project_dir, 'housing_characteristics'), 'lib/housing_characteristics', 'ro'),
+            (docker_weather_dir, 'weather', 'ro')
         ]
         docker_volume_mounts = dict([(key, {'bind': f'/var/simdata/openstudio/{bind}', 'mode': mode}) for key, bind, mode in bind_mounts])  # noqa E501
+
         for bind in bind_mounts:
             dir_to_make = os.path.join(sim_dir, *bind[1].split('/'))
             if not os.path.exists(dir_to_make):
@@ -114,6 +140,9 @@ class LocalDockerBatch(DockerBatchBase):
         with open(os.path.join(sim_dir, 'in.osw'), 'w') as f:
             json.dump(osw, f, indent=4)
 
+        print(os.path.abspath(os.path.join(sim_dir, 'in.osw')),
+              os.path.exists(os.path.join(sim_dir, 'in.osw')))
+
         docker_client = docker.client.from_env()
         args = [
             'openstudio',
@@ -122,9 +151,27 @@ class LocalDockerBatch(DockerBatchBase):
         ]
         if measures_only:
             args.insert(2, '--measures_only')
+        args.insert(1, '--verbose')
         extra_kws = {}
         if sys.platform.startswith('linux'):
             extra_kws['user'] = f'{os.getuid()}:{os.getgid()}'
+        logger.debug("docker_volume_mounts %s" % docker_volume_mounts)
+        # import glob
+        # print(glob.glob(weather_dir+"/*"))
+        # put
+
+        container_output = docker_client.containers.run(
+            docker_image,
+            command = "ls -la ./weather",
+            remove=True,
+            volumes=docker_volume_mounts,
+            name=sim_id,
+            **extra_kws
+        )
+        logger.debug("test_container_output: %s" % container_output.decode("utf-8"))
+
+
+
         container_output = docker_client.containers.run(
             docker_image,
             args,
@@ -133,6 +180,8 @@ class LocalDockerBatch(DockerBatchBase):
             name=sim_id,
             **extra_kws
         )
+        logger.debug("run_container_output %s" % container_output.decode("utf-8"))
+
         with open(os.path.join(sim_dir, 'docker_output.log'), 'wb') as f_out:
             f_out.write(container_output)
 
@@ -174,6 +223,40 @@ class LocalDockerBatch(DockerBatchBase):
             n_datapoints,
             self.cfg
         )
+        if os.environ['HOST_PATH']:
+            host_path  = "/"+os.environ['HOST_PATH'].replace("\\","/").replace(":","")
+            docker_buildstock_dir =   self.buildstock_dir.replace(os.environ['PWD'],host_path)
+            docker_result_dir = self.results_dir.replace(os.environ['PWD'],host_path)
+        else:
+            docker_buildstock_dir =   self.buildstock_dir
+            docker_result_dir = self.results_dir
+
+        test_output= self.run_building(
+            self.project_dir,
+            self.buildstock_dir,
+            self.weather_dir,
+            self.docker_image,
+           self.results_dir,
+            measures_only,
+            n_datapoints,
+            self.cfg,
+            i = 1
+            )
+        logger.debug("test_output: %s" % test_output)
+        put
+        test_agrument_inputs = {
+            "self.project_dir" :   self.project_dir,
+            "docker_buildstock_dir" :   docker_buildstock_dir,
+            "self.weather_dir"  : self.weather_dir,
+            "self.docker_image" :  self.docker_image,
+            "docker_result_dir"  : docker_result_dir,
+            "measures_only"  :  measures_only,
+            "n_datapoints"  :  n_datapoints,
+            "self.cfg" :  self.cfg,
+            "i" : 1
+            }
+        for i,v in test_agrument_inputs.items():
+            logger.debug("test_%s : %s"%(i,v))
         upgrade_sims = []
         for i in range(len(self.cfg.get('upgrades', []))):
             upgrade_sims.append(map(functools.partial(run_building_d, upgrade_idx=i), building_ids))
@@ -185,10 +268,13 @@ class LocalDockerBatch(DockerBatchBase):
         if n_jobs is None:
             client = docker.client.from_env()
             n_jobs = client.info()['NCPU']
-        dpouts = Parallel(n_jobs=n_jobs, verbose=10)(all_sims)
+        for i,v in enumerate(list(all_sims)):
+            logger.debug("all_sim_%s: %s" %(i,v))
+        put
+        dpouts = Parallel(n_jobs=n_jobs, verbose=50)(all_sims)
 
         sim_out_dir = os.path.join(self.results_dir, 'simulation_output')
-
+        put
         results_job_json_filename = os.path.join(sim_out_dir, 'results_job0.json.gz')
         with gzip.open(results_job_json_filename, 'wt', encoding='utf-8') as f:
             json.dump(dpouts, f)
