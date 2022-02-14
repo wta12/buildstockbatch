@@ -284,9 +284,14 @@ def combine_results(fs, results_dir, cfg, do_timeseries=True):
     # create the postprocessing results directories
     for dr in dirs:
         fs.makedirs(dr)
-
+    import os
+    print(os.path.realpath(sim_output_dir))
+    sim_output_dir_path  = os.path.realpath(sim_output_dir)
+    logger.debug(os.path.exists(sim_output_dir_path))
+    logger.debug(os.listdir(sim_output_dir_path))
     # Results "CSV"
-    results_json_files = fs.glob(f'{sim_output_dir}/results_job*.json.gz')
+    results_json_files = fs.glob(f'{os.path.realpath(sim_output_dir)}/results_job*.json.gz')
+    logger.debug("results_json_files:\n%s" % ":".join(results_json_files))
     if results_json_files:
         delayed_results_dfs = [dask.delayed(read_results_json)(fs, x) for x in results_json_files]
         results_df = dd.from_delayed(delayed_results_dfs,  verify_meta=False)
@@ -399,15 +404,20 @@ def combine_results(fs, results_dir, cfg, do_timeseries=True):
 
 
 def remove_intermediate_files(fs, results_dir, keep_individual_timeseries=False):
-    # Remove aggregated files to save space
     sim_output_dir = f'{results_dir}/simulation_output'
     results_job_json_glob = f'{sim_output_dir}/results_job*.json.gz'
-    logger.info('Removing results_job*.json.gz')
-    for filename in fs.glob(results_job_json_glob):
-        fs.rm(filename)
-    if not keep_individual_timeseries:
-        ts_in_dir = f'{sim_output_dir}/timeseries'
-        fs.rm(ts_in_dir, recursive=True)
+    # Remove aggregated files to save space if setup through env
+    import os
+    logger.debug("BSB_REMOVE_RESULTS: %s " % os.environ['BSB_REMOVE_RESULTS'])
+    if os.environ['BSB_REMOVE_RESULTS']:
+        logger.info("Skip removing results for testing postprocessing")
+    else:
+        logger.info('Removing results_job*.json.gz')
+        for filename in fs.glob(results_job_json_glob):
+            fs.rm(filename)
+        if not keep_individual_timeseries:
+            ts_in_dir = f'{sim_output_dir}/timeseries'
+            fs.rm(ts_in_dir, recursive=True)
 
 
 def upload_results(aws_conf, output_dir, results_dir):

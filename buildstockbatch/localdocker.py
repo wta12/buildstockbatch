@@ -96,23 +96,40 @@ class LocalDockerBatch(DockerBatchBase):
             sim_id, sim_dir = cls.make_sim_dir(i, upgrade_idx, os.path.join(results_dir, 'simulation_output'))
         except SimulationExists:
             return
-
+        logger.debug("sim_id %s" %sim_id)
+        logger.debug("sim_dir %s" % sim_dir)
+        logger.debug("projectdir % s" % project_dir)
+        logger.debug("buildstock_dir % s" % buildstock_dir)
+        # print("weather_dir % s" % weather_dir)
+        # put
+        if os.environ['HOST_PATH']:
+            host_path  = "/"+os.environ['HOST_PATH'].replace("\\","/").replace(":","")
+            docker_buildstock_dir = buildstock_dir.replace(os.environ['PWD'],host_path)
+            docker_sim_dir = sim_dir.replace(os.environ['PWD'],host_path)
+            docker_project_dir  = project_dir.replace(os.environ['PWD'],host_path)
+            docker_weather_dir = weather_dir.replace(os.environ['PWD'],host_path)
+        else:
+            docker_buildstock_dir = buildstock_dir
+            docker_sim_dir = sim_dir
+            docker_project_dir  = project_dir
+            docker_weather_dir = weather_dir
         bind_mounts = [
-            (sim_dir, '', 'rw'),
-            (os.path.join(buildstock_dir, 'measures'), 'measures', 'ro'),
-            (os.path.join(buildstock_dir, 'resources'), 'lib/resources', 'ro'),
-            (os.path.join(project_dir, 'housing_characteristics'), 'lib/housing_characteristics', 'ro'),
-            (weather_dir, 'weather', 'ro')
+            (docker_sim_dir, '', 'rw'),
+            (os.path.join(docker_buildstock_dir, 'measures'), 'measures', 'ro'),
+            (os.path.join(docker_buildstock_dir, 'resources'), 'lib/resources', 'ro'),
+            (os.path.join(docker_project_dir, 'housing_characteristics'), 'lib/housing_characteristics', 'ro'),
+            (docker_weather_dir, 'weather', 'ro')
+            # (weather_dir, 'weather', 'ro')
         ]
         if os.path.exists(os.path.join(buildstock_dir, 'resources', 'hpxml-measures')):
-            bind_mounts += [(os.path.join(buildstock_dir, 'resources', 'hpxml-measures'),
+            bind_mounts += [(os.path.join(docker_buildstock_dir, 'resources', 'hpxml-measures'),
                             'resources/hpxml-measures', 'ro')]
         docker_volume_mounts = dict([(key, {'bind': f'/var/simdata/openstudio/{bind}', 'mode': mode}) for key, bind, mode in bind_mounts])  # noqa E501
         for bind in bind_mounts:
             dir_to_make = os.path.join(sim_dir, *bind[1].split('/'))
             if not os.path.exists(dir_to_make):
                 os.makedirs(dir_to_make)
-
+            logger.debug("dir_to_make: %s" % dir_to_make)
         osw = cls.create_osw(cfg, n_datapoints, sim_id, building_id=i, upgrade_idx=upgrade_idx)
 
         with open(os.path.join(sim_dir, 'in.osw'), 'w') as f:
@@ -126,9 +143,28 @@ class LocalDockerBatch(DockerBatchBase):
         ]
         if measures_only:
             args.insert(2, '--measures_only')
+        args.insert(1, '--verbose')
         extra_kws = {}
         if sys.platform.startswith('linux'):
             extra_kws['user'] = f'{os.getuid()}:{os.getgid()}'
+        logger.debug("docker_volume_mounts %s" % docker_volume_mounts)
+        # print("extra_kws: %s" % extra_kws)
+        # print("username %s" % os.path.expanduser('~'))
+        # test_args = " ls -la ./weather"
+        # container_output = docker_client.containers.run(
+        #     docker_image,
+        #     test_args,
+        #     remove=True,
+        #     volumes=docker_volume_mounts,
+        #     name=sim_id,
+        #     **extra_kws
+        # )
+        # for line in container_output.decode('utf-8').split('\n'):
+        #     print(line)
+        
+        # with open(os.path.join(sim_dir, 'docker_output_test.log'), 'wb') as f_out:
+        #     f_out.write(container_output)
+   
         container_output = docker_client.containers.run(
             docker_image,
             args,
@@ -137,8 +173,10 @@ class LocalDockerBatch(DockerBatchBase):
             name=sim_id,
             **extra_kws
         )
+        print("run_container_output %s" % container_output.decode("utf-8"))
         with open(os.path.join(sim_dir, 'docker_output.log'), 'wb') as f_out:
             f_out.write(container_output)
+            
 
         # Clean up directories created with the docker mounts
         for dirname in ('lib', 'measures', 'weather'):
@@ -178,6 +216,22 @@ class LocalDockerBatch(DockerBatchBase):
             n_datapoints,
             self.cfg
         )
+        # test_agrument_inputs = {
+        #     "self.project_dir" :   self.project_dir,
+        #     "self.results_dir" :   self.buildstock_dir,
+        #     "self.weather_dir"  : self.weather_dir,
+        #     "self.docker_image" :  self.docker_image,
+        #     "self.results_dir"  : self.results_dir,
+        #     "measures_only"  :  measures_only,
+        #     "n_datapoints"  :  n_datapoints,
+        #     "self.cfg" :  self.cfg,
+        #     "i" : 1
+        #     }
+        # test_agrument_input_text = ''
+        # for i,v in test_agrument_inputs.items():
+        #     test_agrument_input_text += "test_%s : %s"%(i,v)+"\n"
+        # logger.debug("test_agrument_inputs:\n%s" % test_agrument_input_text)
+
         upgrade_sims = []
         for i in range(len(self.cfg.get('upgrades', []))):
             upgrade_sims.append(map(functools.partial(run_building_d, upgrade_idx=i), building_ids))
@@ -191,6 +245,7 @@ class LocalDockerBatch(DockerBatchBase):
             n_jobs = client.info()['NCPU']
         dpouts = Parallel(n_jobs=n_jobs, verbose=10)(all_sims)
 
+      
         sim_out_dir = os.path.join(self.results_dir, 'simulation_output')
 
         results_job_json_filename = os.path.join(sim_out_dir, 'results_job0.json.gz')
@@ -233,7 +288,7 @@ def main():
         'disable_existing_loggers': True,
         'formatters': {
             'defaultfmt': {
-                'format': '%(levelname)s:%(asctime)s:%(name)s:%(message)s',
+                'format': '%(levelname)s:%(asctime)s:%(name)s:[%(filename)s:%(lineno)d]:%(message)s',
                 'datefmt': '%Y-%m-%d %H:%M:%S'
             }
         },
@@ -285,7 +340,7 @@ def main():
                        action='store_true')
     args = parser.parse_args()
     if not os.path.isfile(args.project_filename):
-        raise FileNotFoundError(f'The project file {args.project_filename} doesn\'t exist')
+        raise FileNotFoundError(f"The project file %s doesn\'t exist" % args.project_filename )
 
     # Validate the project, and in case of the --validateonly flag return True if validation passes
     LocalDockerBatch.validate_project(args.project_filename)
