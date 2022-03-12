@@ -103,7 +103,7 @@ class LocalDockerBatch(DockerBatchBase):
         # print("weather_dir % s" % weather_dir)
         # put
         if os.environ['HOST_PATH']:
-            host_path  = "/"+os.environ['HOST_PATH'].replace("\\","/").replace(":","")
+            host_path  =  os.environ['HOST_PATH']
             docker_buildstock_dir = buildstock_dir.replace(os.environ['PWD'],host_path)
             docker_sim_dir = sim_dir.replace(os.environ['PWD'],host_path)
             docker_project_dir  = project_dir.replace(os.environ['PWD'],host_path)
