@@ -101,20 +101,24 @@ class LocalDockerBatch(DockerBatchBase):
         logger.debug("projectdir % s" % project_dir)
         logger.debug("buildstock_dir % s" % buildstock_dir)
         logger.debug("weather_dir % s" % weather_dir)
-        logger.debug("os.environ['HOST_PATH'] % s" % os.environ['HOST_PATH'])
         
+        default_workflow = True
         # put
-        if os.environ['HOST_PATH']:
+        if 'HOST_PATH' in os.environ.keys():
+            logger.debug("os.environ['HOST_PATH'] % s" % os.environ['HOST_PATH'])
+            if os.environ['HOST_PATH']:
+                default_workflow = False
+        if default_workflow:
+            docker_buildstock_dir = buildstock_dir
+            docker_sim_dir = sim_dir
+            docker_project_dir  = project_dir
+            docker_weather_dir = weather_dir
+        else:
             host_path  = os.path.abspath(os.environ['HOST_PATH'])
             docker_buildstock_dir = buildstock_dir.replace(os.environ['PWD'],host_path)
             docker_sim_dir = sim_dir.replace(os.environ['PWD'],host_path)
             docker_project_dir  = project_dir.replace(os.environ['PWD'],host_path)
             docker_weather_dir = weather_dir.replace(os.environ['PWD'],host_path)
-        else:
-            docker_buildstock_dir = buildstock_dir
-            docker_sim_dir = sim_dir
-            docker_project_dir  = project_dir
-            docker_weather_dir = weather_dir
         logger.debug("host_path %s" % host_path)
         logger.debug("docker_sim_dir %s" % docker_sim_dir)
         logger.debug("docker_projectdir % s" % docker_project_dir)
@@ -142,7 +146,6 @@ class LocalDockerBatch(DockerBatchBase):
         logger.debug("osw: %s" % osw)
         with open(os.path.join(sim_dir, 'in.osw'), 'w') as f:
             json.dump(osw, f, indent=4)
-        
         docker_client = docker.client.from_env()
         args = [
             'openstudio',
@@ -175,7 +178,7 @@ class LocalDockerBatch(DockerBatchBase):
             )
             for line in container_output.decode('utf-8').split('\n'):
                 print(line)
-       
+        
         # for dir_name in os.listdir(sim_dir):
         #     logger.debug("entries in %s : %s" %(sim_dir,dir_name))
       
