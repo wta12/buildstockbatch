@@ -75,7 +75,7 @@ class ResidentialQuotaSampler(BuildStockSampler):
             logger.debug("docker_test_closing error: %s" % e)
         # logger.debug(self.buildstock_dir)
         if os.environ['HOST_PATH']:
-            host_path  = "/"+os.environ['HOST_PATH'].replace("\\","/").replace(":","")
+            host_path  = os.path.abspath(os.environ['HOST_PATH'])
             docker_path =   os.path.realpath(self.buildstock_dir.replace(os.environ['PWD'],host_path))
         else:
             docker_path = self.buildstock_dir

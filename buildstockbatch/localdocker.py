@@ -100,10 +100,12 @@ class LocalDockerBatch(DockerBatchBase):
         logger.debug("sim_dir %s" % sim_dir)
         logger.debug("projectdir % s" % project_dir)
         logger.debug("buildstock_dir % s" % buildstock_dir)
-        # print("weather_dir % s" % weather_dir)
+        logger.debug("weather_dir % s" % weather_dir)
+        logger.debug("os.environ['HOST_PATH'] % s" % os.environ['HOST_PATH'])
+        
         # put
         if os.environ['HOST_PATH']:
-            host_path  = "/"+os.environ['HOST_PATH'].replace("\\","/").replace(":","")
+            host_path  = os.path.abspath(os.environ['HOST_PATH'])
             docker_buildstock_dir = buildstock_dir.replace(os.environ['PWD'],host_path)
             docker_sim_dir = sim_dir.replace(os.environ['PWD'],host_path)
             docker_project_dir  = project_dir.replace(os.environ['PWD'],host_path)
@@ -113,6 +115,12 @@ class LocalDockerBatch(DockerBatchBase):
             docker_sim_dir = sim_dir
             docker_project_dir  = project_dir
             docker_weather_dir = weather_dir
+        logger.debug("host_path %s" % host_path)
+        logger.debug("docker_sim_dir %s" % docker_sim_dir)
+        logger.debug("docker_projectdir % s" % docker_project_dir)
+        logger.debug("docker_buildstock_dir % s" % docker_buildstock_dir)
+        logger.debug("docker_weather_dir % s" % docker_weather_dir)
+       
         bind_mounts = [
             (docker_sim_dir, '', 'rw'),
             (os.path.join(docker_buildstock_dir, 'measures'), 'measures', 'ro'),
@@ -131,10 +139,10 @@ class LocalDockerBatch(DockerBatchBase):
                 os.makedirs(dir_to_make)
             logger.debug("dir_to_make: %s" % dir_to_make)
         osw = cls.create_osw(cfg, n_datapoints, sim_id, building_id=i, upgrade_idx=upgrade_idx)
-
+        logger.debug("osw: %s" % osw)
         with open(os.path.join(sim_dir, 'in.osw'), 'w') as f:
             json.dump(osw, f, indent=4)
-
+        
         docker_client = docker.client.from_env()
         args = [
             'openstudio',
@@ -148,32 +156,52 @@ class LocalDockerBatch(DockerBatchBase):
         if sys.platform.startswith('linux'):
             extra_kws['user'] = f'{os.getuid()}:{os.getgid()}'
         logger.debug("docker_volume_mounts %s" % docker_volume_mounts)
-        # print("extra_kws: %s" % extra_kws)
+        print("extra_kws: %s" % extra_kws)
         # print("username %s" % os.path.expanduser('~'))
-        # test_args = " ls -la ./weather"
-        # container_output = docker_client.containers.run(
-        #     docker_image,
-        #     test_args,
-        #     remove=True,
-        #     volumes=docker_volume_mounts,
-        #     name=sim_id,
-        #     **extra_kws
-        # )
-        # for line in container_output.decode('utf-8').split('\n'):
-        #     print(line)
-        
+        test_args = [
+                    ["/bin/bash", "-c",
+                     "tar -zcvf ../workspace.gz  . && cp ../workspace.gz ."]
+                    # "ls -la ../ ",
+                    # "ls -la"linux g
+                     ]
+        for arg in test_args:
+            container_output = docker_client.containers.run(
+                docker_image,
+                arg,
+                remove=True,
+                volumes=docker_volume_mounts,
+                name=sim_id,
+                **extra_kws
+            )
+            for line in container_output.decode('utf-8').split('\n'):
+                print(line)
+       
+        # for dir_name in os.listdir(sim_dir):
+        #     logger.debug("entries in %s : %s" %(sim_dir,dir_name))
+      
+        # extra_kws['stdout'] = True
+        # extra_kws['stderr'] = True
+        # extra_kws['remove'] = False 
+        # extra_kws['detach'] = True
         # with open(os.path.join(sim_dir, 'docker_output_test.log'), 'wb') as f_out:
         #     f_out.write(container_output)
-   
+        # try:
         container_output = docker_client.containers.run(
-            docker_image,
-            args,
-            remove=True,
-            volumes=docker_volume_mounts,
-            name=sim_id,
-            **extra_kws
+                    docker_image,
+                    args,
+                    remove=True,
+                    volumes=docker_volume_mounts,
+                    name=sim_id,
+                    **extra_kws
         )
-        print("run_container_output %s" % container_output.decode("utf-8"))
+            
+        # except Exception as exc:
+        #     print(exc)
+        #     print(docker_client.containers.logs())
+        #     raise
+        
+        for line in container_output.decode('utf-8').split('\n'):
+            print(line)
         with open(os.path.join(sim_dir, 'docker_output.log'), 'wb') as f_out:
             f_out.write(container_output)
             
@@ -201,7 +229,7 @@ class LocalDockerBatch(DockerBatchBase):
 
         if sampling_only:
             return
-
+        
         df = pd.read_csv(buildstock_csv_filename, index_col=0)
         building_ids = df.index.tolist()
         n_datapoints = len(building_ids)
@@ -245,7 +273,7 @@ class LocalDockerBatch(DockerBatchBase):
             n_jobs = client.info()['NCPU']
         dpouts = Parallel(n_jobs=n_jobs, verbose=10)(all_sims)
 
-      
+        logger.debug("dpouts : %s" % dpouts)
         sim_out_dir = os.path.join(self.results_dir, 'simulation_output')
 
         results_job_json_filename = os.path.join(sim_out_dir, 'results_job0.json.gz')
