@@ -408,16 +408,21 @@ def remove_intermediate_files(fs, results_dir, keep_individual_timeseries=False)
     results_job_json_glob = f'{sim_output_dir}/results_job*.json.gz'
     # Remove aggregated files to save space if setup through env
     import os
+    default_workflow = True
     if 'BSB_REMOVE_RESULTS' in os.environ.keys():
         logger.debug("BSB_REMOVE_RESULTS: %s " % os.environ['BSB_REMOVE_RESULTS'])
-        logger.info("Skip removing results for testing postprocessing")
-    else:
+        if os.environ['BSB_REMOVE_RESULTS']:
+            default_workflow = False
+    if default_workflow:
         logger.info('Removing results_job*.json.gz')
         for filename in fs.glob(results_job_json_glob):
             fs.rm(filename)
         if not keep_individual_timeseries:
             ts_in_dir = f'{sim_output_dir}/timeseries'
             fs.rm(ts_in_dir, recursive=True)
+    else:
+        logger.info("Skip removing results for testing postprocessing")
+        
 
 
 def upload_results(aws_conf, output_dir, results_dir):
