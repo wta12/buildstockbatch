@@ -567,6 +567,8 @@ class BuildStockBatchBase(object):
             do_timeseries = 'timeseries_csv_export' in self.cfg['workflow_generator']['args'].keys()
 
         fs = LocalFileSystem()
+        
+        logger.debug(f'process_result_input - self.results_dir: {self.results_dir}')
         if not skip_combine:
             postprocessing.combine_results(fs, self.results_dir, self.cfg, do_timeseries=do_timeseries)
 
