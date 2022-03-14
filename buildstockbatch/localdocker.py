@@ -114,7 +114,7 @@ class LocalDockerBatch(DockerBatchBase):
             docker_project_dir  = project_dir
             docker_weather_dir = weather_dir
         else:
-            host_path  = os.path.abspath(os.environ['HOST_PATH'])
+            host_path  = os.path.realpath(os.environ['HOST_PATH'])
             docker_buildstock_dir = buildstock_dir.replace(os.environ['PWD'],host_path)
             docker_sim_dir = sim_dir.replace(os.environ['PWD'],host_path)
             docker_project_dir  = project_dir.replace(os.environ['PWD'],host_path)
@@ -141,11 +141,14 @@ class LocalDockerBatch(DockerBatchBase):
             dir_to_make = os.path.join(sim_dir, *bind[1].split('/'))
             if not os.path.exists(dir_to_make):
                 os.makedirs(dir_to_make)
-            logger.debug("dir_to_make: %s" % dir_to_make)
+                print("dir_to_make: %s" % dir_to_make)
+                logger.debug("dir_to_make: %s" % dir_to_make)
+        
         osw = cls.create_osw(cfg, n_datapoints, sim_id, building_id=i, upgrade_idx=upgrade_idx)
         logger.debug("osw: %s" % osw)
         with open(os.path.join(sim_dir, 'in.osw'), 'w') as f:
             json.dump(osw, f, indent=4)
+        
         docker_client = docker.client.from_env()
         args = [
             'openstudio',
@@ -163,8 +166,8 @@ class LocalDockerBatch(DockerBatchBase):
         # print("username %s" % os.path.expanduser('~'))
         test_args = [
                     ["/bin/bash", "-c",
-                     "tar -zcvf ../workspace.gz  . && cp ../workspace.gz ."]
-                    # "ls -la ../ ",
+                     "tar -zcvf ../workspace.gz  . && cp ../workspace.gz ."],
+                    # ["/bin/bash", "-c" , 'find "$PWD" -type d'],
                     # "ls -la"linux g
                      ]
         for arg in test_args:
@@ -176,9 +179,12 @@ class LocalDockerBatch(DockerBatchBase):
                 name=sim_id,
                 **extra_kws
             )
+            # print(arg)
             for line in container_output.decode('utf-8').split('\n'):
                 print(line)
-        
+        #     put
+        # print(docker_volume_mounts)
+        # put
         # for dir_name in os.listdir(sim_dir):
         #     logger.debug("entries in %s : %s" %(sim_dir,dir_name))
       
