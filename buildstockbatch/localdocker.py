@@ -166,7 +166,8 @@ class LocalDockerBatch(DockerBatchBase):
         # print("username %s" % os.path.expanduser('~'))
         test_args = [
                     ["/bin/bash", "-c",
-                     "tar -zcvf ../workspace.gz  . && cp ../workspace.gz ."],
+                     "tar -zcf ../workspace.gz  . && cp ../workspace.gz ."],
+                    # ["/bin/bash", "-c","ls -la /var/simdata/openstudio/lib/resources/measures"],
                     # ["/bin/bash", "-c" , 'find "$PWD" -type d'],
                     # "ls -la"linux g
                      ]
@@ -194,23 +195,25 @@ class LocalDockerBatch(DockerBatchBase):
         # extra_kws['detach'] = True
         # with open(os.path.join(sim_dir, 'docker_output_test.log'), 'wb') as f_out:
         #     f_out.write(container_output)
-        # try:
-        container_output = docker_client.containers.run(
-                    docker_image,
-                    args,
-                    remove=True,
-                    volumes=docker_volume_mounts,
-                    name=sim_id,
-                    **extra_kws
-        )
+        try:
+            container_output = docker_client.containers.run(
+                        docker_image,
+                        args,
+                        remove=True,
+                        volumes=docker_volume_mounts,
+                        name=sim_id,
+                        **extra_kws
+            )
             
-        # except Exception as exc:
-        #     print(exc)
-        #     print(docker_client.containers.logs())
-        #     raise
+        except Exception as exc:
+            print("Failed to run container")
+            # for line in container_output.decode('utf-8').split('\n'):
+            #     print(line)
+            raise exc
+            
+            
         
-        for line in container_output.decode('utf-8').split('\n'):
-            print(line)
+       
         with open(os.path.join(sim_dir, 'docker_output.log'), 'wb') as f_out:
             f_out.write(container_output)
             
@@ -280,9 +283,12 @@ class LocalDockerBatch(DockerBatchBase):
         if n_jobs is None:
             client = docker.client.from_env()
             n_jobs = client.info()['NCPU']
+        import inspect
+        
         dpouts = Parallel(n_jobs=n_jobs, verbose=10)(all_sims)
 
         logger.debug("dpouts : %s" % dpouts)
+        
         sim_out_dir = os.path.join(self.results_dir, 'simulation_output')
 
         results_job_json_filename = os.path.join(sim_out_dir, 'results_job0.json.gz')
