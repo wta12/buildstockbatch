@@ -85,6 +85,21 @@ def flatten_datapoint_json(reporting_measures, d):
     col2 = sim_out_report
     for k, v in d.get(col2, {}).items():
         new_d[f"{col2}.{k}"] = v
+    ## adding non-default measures report variables
+    default_measure_names = [
+        "BuildExistingModel",
+        "HPXMLtoOpenStudio",
+        "QOIReport",
+        "ReportSimulationOutput",
+        "ReportUtilityBills",
+        "ServerDirectoryCleanup",
+        "UpgradeCosts",
+    ]
+    for key in d.keys():
+        if key not in default_measure_names:
+            new_col = key
+            for k, v in d.get(new_col, {}).items():
+                new_d[f"{new_col}.{k}"] = v
 
     # additional reporting measures
     if sim_out_report == "ReportSimulationOutput":
